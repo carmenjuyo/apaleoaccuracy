@@ -33,7 +33,7 @@ def read_data(file, is_history_and_forecast_file):
         for col in expected_columns:
             if col not in df.columns:
                 raise ValueError(f"Expected column '{col}' not found in the uploaded file.")
-        df = df[['arrivalDate', '"rn"', '"revNet"']]
+        df = df[['arrivalDate', 'rn', 'revNet']]
         df.columns = ['date', 'Juyo RN', 'Juyo Rev']  # Rename columns for consistency
         try:
             df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce').dt.date
