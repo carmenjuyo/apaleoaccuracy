@@ -150,7 +150,7 @@ def main():
                 filename_parts = history_forecast_file.name.split('_')
                 if len(filename_parts) >= 4:
                     cutoff_str = filename_parts[3]  # Example: '2024-12-18'
-                    cutoff_date = datetime.strptime(cutoff_str, "%Y-%m-%d").date() - pd.Timedelta(days=1)
+                    cutoff_date = datetime.strptime(cutoff_str, "%Y-%m-%d").date() - timedelta(days=1)
                 else:
                     raise ValueError("Filename does not contain the expected date format.")
 
@@ -212,4 +212,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
