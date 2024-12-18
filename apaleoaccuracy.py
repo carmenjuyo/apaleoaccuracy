@@ -122,10 +122,6 @@ def create_excel_download(merged_df, accuracy_data):
     output.seek(0)
     return output
 
-
-
-import pytz  # Add this import to handle timezones
-
 def main():
     # Center the title
     st.markdown("<h1 style='text-align: center;'> Guestline Daily Variance and Accuracy Calculator</h1>", unsafe_allow_html=True)
@@ -137,23 +133,16 @@ def main():
     with col2:
         daily_totals_file = st.file_uploader("Upload Daily Totals (.csv)", type=['csv'])
 
-    # Allow user to choose revenue column
-    revenue_column_choice = None
-    if history_forecast_file:
-        st.markdown("**Select Revenue Column to Use:**")
-        revenue_column_choice = st.radio(
-            "Choose a revenue column:", 
-            ['netAccommodationRevenue', 'grossRevenue'], 
-            index=0
-        )
+    # Revenue Type Selection
+    revenue_type = st.radio("Select Revenue Type for History and Forecast", ["netAccommodationRevenue", "grossRevenue"], index=0)
 
     if history_forecast_file and daily_totals_file:
         if st.button("Process Data"):
             try:
                 progress_bar = st.progress(0)
 
-                # Read the files with user choice for revenue column
-                hf_df = read_data(history_forecast_file, is_history_and_forecast_file=True, revenue_column=revenue_column_choice)
+                # Read files with dynamic revenue type
+                hf_df = read_data(history_forecast_file, is_history_and_forecast_file=True, revenue_type=revenue_type)
                 progress_bar.progress(25)
 
                 dt_df = read_data(daily_totals_file, is_history_and_forecast_file=False)
@@ -173,7 +162,6 @@ def main():
                                 (1 - abs(row['RN Diff']) / row['AF RNs']) * 100 if row['AF RNs'] != 0 else 0.0,
                     axis=1
                 )
-
                 merged_df['Abs Rev Accuracy'] = merged_df.apply(
                     lambda row: 100.0 if row['AF Rev'] == 0 and row['Juyo Rev'] == 0 else 
                                 (1 - abs(row['Rev Diff']) / row['AF Rev']) * 100 if row['AF Rev'] != 0 else 0.0,
@@ -186,8 +174,7 @@ def main():
 
                 progress_bar.progress(75)
 
-                # Accuracy Matrix Table
-                st.markdown("### Accuracy Matrix")
+                # Calculate overall accuracies
                 current_date = pd.to_datetime('today').date()
                 past_mask = merged_df['date'] < current_date
                 future_mask = merged_df['date'] >= current_date
@@ -196,100 +183,49 @@ def main():
                 future_rooms_accuracy = (1 - abs(merged_df.loc[future_mask, 'RN Diff']).sum() / merged_df.loc[future_mask, 'AF RNs'].sum()) * 100
                 future_revenue_accuracy = (1 - abs(merged_df.loc[future_mask, 'Rev Diff']).sum() / merged_df.loc[future_mask, 'AF Rev'].sum()) * 100
 
+                # Accuracy Matrix Table
+                st.markdown("### Accuracy Matrix")
                 accuracy_data = {
                     "Metric": ["RNs", "Revenue"],
                     "Past": [f"{past_rooms_accuracy:.2f}%", f"{past_revenue_accuracy:.2f}%"],
                     "Future": [f"{future_rooms_accuracy:.2f}%", f"{future_revenue_accuracy:.2f}%"]
                 }
-
-                # Colour scaling for Accuracy Matrix
-                def accuracy_color(val):
-                    val = float(val.strip('%'))
-                    if val >= 98:
-                        return 'background-color: #469798; color: white;'
-                    elif 95 <= val < 98:
-                        return 'background-color: #F2A541; color: white;'
-                    else:
-                        return 'background-color: #BF3100; color: white;'
-
                 accuracy_df = pd.DataFrame(accuracy_data)
-                styled_accuracy_df = accuracy_df.style.applymap(accuracy_color, subset=['Past', 'Future'])
+
+                styled_accuracy_df = accuracy_df.style.applymap(
+                    lambda val: 'background-color: #469798; color: white;' if float(val.strip('%')) >= 98 else
+                                'background-color: #F2A541; color: white;' if 95 <= float(val.strip('%')) < 98 else
+                                'background-color: #BF3100; color: white;',
+                    subset=['Past', 'Future']
+                )
                 st.table(styled_accuracy_df)
 
-                # Visualization directly under Accuracy Matrix
+                # Visualization
                 fig = make_subplots(specs=[[{"secondary_y": True}]])
+                fig.add_trace(go.Bar(x=merged_df['date'], y=merged_df['RN Diff'], name='RNs Discrepancy', marker_color='#469798'), secondary_y=False)
+                fig.add_trace(go.Scatter(x=merged_df['date'], y=merged_df['Rev Diff'], name='Revenue Discrepancy', mode='lines+markers', line=dict(color='#BF3100', width=2)), secondary_y=True)
 
-                # RN Discrepancies - Bar chart
-                fig.add_trace(go.Bar(
-                    x=merged_df['date'],
-                    y=merged_df['RN Diff'],
-                    name='RNs Discrepancy',
-                    marker_color='#469798'
-                ), secondary_y=False)
-
-                # Revenue Discrepancies - Line chart
-                fig.add_trace(go.Scatter(
-                    x=merged_df['date'],
-                    y=merged_df['Rev Diff'],
-                    name='Revenue Discrepancy',
-                    mode='lines+markers',
-                    line=dict(color='#BF3100', width=2),
-                    marker=dict(size=8)
-                ), secondary_y=True)
-
-                # Update layout
-                fig.update_layout(
-                    height=600,
-                    xaxis_title='Date',
-                    yaxis_title='RN Discrepancy',
-                    yaxis2_title='Revenue Discrepancy'
-                )
-
+                fig.update_layout(height=600, xaxis_title='Date', yaxis_title='RN Discrepancy', yaxis2_title='Revenue Discrepancy')
                 st.plotly_chart(fig, use_container_width=True)
 
-               # Day-by-Day Comparison - Full Width
+                # Day-by-Day Comparison
                 st.markdown("### Day-by-Day Comparison")
-                
-                # Styled DataFrame with conditional formatting
                 styled_df = merged_df.style.applymap(
-                    lambda val: (
-                        'background-color: #469798; color: white;' if isinstance(val, str) and val.endswith('%') and float(val.strip('%')) >= 98 else
-                        'background-color: #F2A541; color: white;' if isinstance(val, str) and val.endswith('%') and 95 <= float(val.strip('%')) < 98 else
-                        'background-color: #BF3100; color: white;'
-                    ),
+                    lambda val: 'background-color: #469798; color: white' if isinstance(val, str) and val.endswith('%') and float(val.strip('%')) >= 98 else
+                                'background-color: #F2A541; color: white' if isinstance(val, str) and val.endswith('%') and 95 <= float(val.strip('%')) < 98 else
+                                'background-color: #BF3100; color: white',
                     subset=['Abs RN Accuracy', 'Abs Rev Accuracy']
                 )
-                
-                # Custom CSS for full-width table
-                st.markdown("""
-                    <style>
-                        .dataframe-container {
-                            width: 100%;
-                            overflow-x: auto;
-                        }
-                        table {
-                            width: 100% !important;
-                        }
-                    </style>
-                """, unsafe_allow_html=True)
-                
-                # Render table
-                st.markdown(f"<div class='dataframe-container'>{styled_df.to_html(escape=False)}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='width: 100%; overflow-x: auto;'>{styled_df.to_html(escape=False)}</div>", unsafe_allow_html=True)
 
                 progress_bar.progress(90)
 
-                # Generate Excel file for download
+                # Generate dynamic Excel filename
+                excel_filename = f"{daily_totals_file.name.split('_')[0]}_ACCURACY_REPORT_{datetime.now().strftime('%Y%m%d_%H%M%S')}_CET.xlsx"
                 excel_data = create_excel_download(merged_df, accuracy_data)
-                st.download_button(
-                    label="Download Excel Report", 
-                    data=excel_data, 
-                    file_name="Variance_Report.xlsx", 
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+                st.download_button(label="Download Excel Report", data=excel_data, file_name=excel_filename, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
                 progress_bar.progress(100)
 
             except Exception as e:
                 st.error(f"Error processing files: {e}")
-
-
