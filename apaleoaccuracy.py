@@ -10,7 +10,7 @@ from io import BytesIO
 st.set_page_config(layout="wide", page_title="Apaleo Daily Variance and Accuracy Calculator")
 
 # Define the function to read the two CSV files
-def read_data(file, is_history_and_forecast_file):
+def read_data(file, is_history_and_forecast_file, revenue_column=None):
     if not file.name.endswith('.csv'):
         raise ValueError("Unsupported file format. Please upload a .csv file.")
 
@@ -21,7 +21,11 @@ def read_data(file, is_history_and_forecast_file):
         for col in expected_columns:
             if col not in df.columns:
                 raise ValueError(f"Expected column '{col}' not found in the uploaded file.")
-        df = df[['businessDay', 'soldCount', 'netAccommodationRevenue']]
+        
+        # Use the chosen revenue column dynamically
+        revenue_column = revenue_column if revenue_column in ['netAccommodationRevenue', 'grossRevenue'] else 'netAccommodationRevenue'
+        
+        df = df[['businessDay', 'soldCount', revenue_column]]
         df.columns = ['date', 'AF RNs', 'AF Rev']  # Rename columns for consistency
         try:
             df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce').dt.date
@@ -133,13 +137,23 @@ def main():
     with col2:
         daily_totals_file = st.file_uploader("Upload Daily Totals (.csv)", type=['csv'])
 
+    # Allow user to choose revenue column
+    revenue_column_choice = None
+    if history_forecast_file:
+        st.markdown("**Select Revenue Column to Use:**")
+        revenue_column_choice = st.radio(
+            "Choose a revenue column:", 
+            ['netAccommodationRevenue', 'grossRevenue'], 
+            index=0
+        )
+
     if history_forecast_file and daily_totals_file:
         if st.button("Process Data"):
             try:
                 progress_bar = st.progress(0)
 
-                # Read the files
-                hf_df = read_data(history_forecast_file, is_history_and_forecast_file=True)
+                # Read the files with user choice for revenue column
+                hf_df = read_data(history_forecast_file, is_history_and_forecast_file=True, revenue_column=revenue_column_choice)
                 progress_bar.progress(25)
 
                 dt_df = read_data(daily_totals_file, is_history_and_forecast_file=False)
@@ -172,7 +186,8 @@ def main():
 
                 progress_bar.progress(75)
 
-                # Calculate overall accuracies
+                # Accuracy Matrix Table
+                st.markdown("### Accuracy Matrix")
                 current_date = pd.to_datetime('today').date()
                 past_mask = merged_df['date'] < current_date
                 future_mask = merged_df['date'] >= current_date
@@ -181,15 +196,13 @@ def main():
                 future_rooms_accuracy = (1 - abs(merged_df.loc[future_mask, 'RN Diff']).sum() / merged_df.loc[future_mask, 'AF RNs'].sum()) * 100
                 future_revenue_accuracy = (1 - abs(merged_df.loc[future_mask, 'Rev Diff']).sum() / merged_df.loc[future_mask, 'AF Rev'].sum()) * 100
 
-                # Accuracy Matrix Table with Colour Scaling
-                st.markdown("### Accuracy Matrix")
                 accuracy_data = {
                     "Metric": ["RNs", "Revenue"],
                     "Past": [f"{past_rooms_accuracy:.2f}%", f"{past_revenue_accuracy:.2f}%"],
                     "Future": [f"{future_rooms_accuracy:.2f}%", f"{future_revenue_accuracy:.2f}%"]
                 }
-                accuracy_df = pd.DataFrame(accuracy_data)
 
+                # Colour scaling for Accuracy Matrix
                 def accuracy_color(val):
                     val = float(val.strip('%'))
                     if val >= 98:
@@ -199,11 +212,14 @@ def main():
                     else:
                         return 'background-color: #BF3100; color: white;'
 
+                accuracy_df = pd.DataFrame(accuracy_data)
                 styled_accuracy_df = accuracy_df.style.applymap(accuracy_color, subset=['Past', 'Future'])
                 st.table(styled_accuracy_df)
 
                 # Visualization directly under Accuracy Matrix
                 fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+                # RN Discrepancies - Bar chart
                 fig.add_trace(go.Bar(
                     x=merged_df['date'],
                     y=merged_df['RN Diff'],
@@ -211,6 +227,7 @@ def main():
                     marker_color='#469798'
                 ), secondary_y=False)
 
+                # Revenue Discrepancies - Line chart
                 fig.add_trace(go.Scatter(
                     x=merged_df['date'],
                     y=merged_df['Rev Diff'],
@@ -220,16 +237,28 @@ def main():
                     marker=dict(size=8)
                 ), secondary_y=True)
 
+                # Update layout
                 fig.update_layout(
                     height=600,
                     xaxis_title='Date',
                     yaxis_title='RN Discrepancy',
                     yaxis2_title='Revenue Discrepancy'
                 )
+
                 st.plotly_chart(fig, use_container_width=True)
 
-                # Day-by-Day Comparison - Full Width
+               # Day-by-Day Comparison - Full Width
                 st.markdown("### Day-by-Day Comparison")
+                
+                # Styled DataFrame with conditional formatting
+                styled_df = merged_df.style.applymap(
+                    lambda val: (
+                        'background-color: #469798; color: white;' if isinstance(val, str) and val.endswith('%') and float(val.strip('%')) >= 98 else
+                        'background-color: #F2A541; color: white;' if isinstance(val, str) and val.endswith('%') and 95 <= float(val.strip('%')) < 98 else
+                        'background-color: #BF3100; color: white;'
+                    ),
+                    subset=['Abs RN Accuracy', 'Abs Rev Accuracy']
+                )
                 
                 # Custom CSS for full-width table
                 st.markdown("""
@@ -244,36 +273,23 @@ def main():
                     </style>
                 """, unsafe_allow_html=True)
                 
-                # Styled DataFrame with conditional formatting
-                styled_df = merged_df.style.applymap(
-                    lambda val: 'background-color: #469798; color: white' if isinstance(val, str) and val.endswith('%') and float(val.strip('%')) >= 98 else
-                                'background-color: #F2A541; color: white' if isinstance(val, str) and val.endswith('%') and 95 <= float(val.strip('%')) < 98 else
-                                'background-color: #BF3100; color: white',
-                    subset=['Abs RN Accuracy', 'Abs Rev Accuracy']
-                )
-                
-                # Render table inside a full-width container
+                # Render table
                 st.markdown(f"<div class='dataframe-container'>{styled_df.to_html(escape=False)}</div>", unsafe_allow_html=True)
-
 
                 progress_bar.progress(90)
 
-                # Extract file prefix and current CET time
-                file_prefix = daily_totals_file.name.split('_')[0]
-                cet = pytz.timezone('CET')
-                current_time = datetime.now(cet).strftime('%Y%m%d_%H%M%S')
-
-                # Generate download filename
-                download_filename = f"{file_prefix}_ACCURACY_REPORT_{current_time}.xlsx"
-
-                # Add download button
+                # Generate Excel file for download
                 excel_data = create_excel_download(merged_df, accuracy_data)
-                st.download_button(label="Download Excel Report", data=excel_data, file_name=download_filename, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                st.download_button(
+                    label="Download Excel Report", 
+                    data=excel_data, 
+                    file_name="Variance_Report.xlsx", 
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+
                 progress_bar.progress(100)
 
             except Exception as e:
                 st.error(f"Error processing files: {e}")
 
-if __name__ == "__main__":
-    main()
 
