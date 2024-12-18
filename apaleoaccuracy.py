@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import plotly.graph_objs as go
+import pytz
 from plotly.subplots import make_subplots
 from io import BytesIO
 
@@ -119,7 +120,8 @@ def create_excel_download(merged_df, accuracy_data):
 
 
 
-# Streamlit application
+import pytz  # Add this import to handle timezones
+
 def main():
     # Center the title
     st.markdown("<h1 style='text-align: center;'> Guestline Daily Variance and Accuracy Calculator</h1>", unsafe_allow_html=True)
@@ -202,8 +204,6 @@ def main():
 
                 # Visualization directly under Accuracy Matrix
                 fig = make_subplots(specs=[[{"secondary_y": True}]])
-
-                # RN Discrepancies - Bar chart
                 fig.add_trace(go.Bar(
                     x=merged_df['date'],
                     y=merged_df['RN Diff'],
@@ -211,7 +211,6 @@ def main():
                     marker_color='#469798'
                 ), secondary_y=False)
 
-                # Revenue Discrepancies - Line chart
                 fig.add_trace(go.Scatter(
                     x=merged_df['date'],
                     y=merged_df['Rev Diff'],
@@ -221,51 +220,37 @@ def main():
                     marker=dict(size=8)
                 ), secondary_y=True)
 
-                # Update layout
                 fig.update_layout(
                     height=600,
                     xaxis_title='Date',
                     yaxis_title='RN Discrepancy',
                     yaxis2_title='Revenue Discrepancy'
                 )
-
                 st.plotly_chart(fig, use_container_width=True)
 
-                # Day-by-Day Comparison - Full Width
+                # Day-by-Day Comparison
                 st.markdown("### Day-by-Day Comparison")
-                
-                # Custom CSS for full-width table
-                st.markdown("""
-                    <style>
-                        .dataframe-container {
-                            width: 100%;
-                            overflow-x: auto;
-                        }
-                        table {
-                            width: 100% !important;
-                        }
-                    </style>
-                """, unsafe_allow_html=True)
-                
-                # Styled DataFrame with conditional formatting
                 styled_df = merged_df.style.applymap(
                     lambda val: 'background-color: #469798; color: white' if isinstance(val, str) and val.endswith('%') and float(val.strip('%')) >= 98 else
                                 'background-color: #F2A541; color: white' if isinstance(val, str) and val.endswith('%') and 95 <= float(val.strip('%')) < 98 else
                                 'background-color: #BF3100; color: white',
                     subset=['Abs RN Accuracy', 'Abs Rev Accuracy']
                 )
-                
-                # Render table inside a full-width container
-                st.markdown(f"<div class='dataframe-container'>{styled_df.to_html(escape=False)}</div>", unsafe_allow_html=True)
-
+                st.dataframe(styled_df)
 
                 progress_bar.progress(90)
 
+                # Extract file prefix and current CET time
+                file_prefix = daily_totals_file.name.split('_')[0]
+                cet = pytz.timezone('CET')
+                current_time = datetime.now(cet).strftime('%Y%m%d_%H%M%S')
+
+                # Generate download filename
+                download_filename = f"{file_prefix}_ACCURACY_REPORT_{current_time}.xlsx"
+
                 # Add download button
                 excel_data = create_excel_download(merged_df, accuracy_data)
-                st.download_button(label="Download Excel Report", data=excel_data, file_name="Variance_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                
-
+                st.download_button(label="Download Excel Report", data=excel_data, file_name=download_filename, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                 progress_bar.progress(100)
 
             except Exception as e:
@@ -273,3 +258,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
