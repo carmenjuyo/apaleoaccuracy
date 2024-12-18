@@ -205,14 +205,14 @@ def main():
 
                 # Day-by-Day Comparison
                 st.markdown("### Day-by-Day Comparison")
-                styled_df = merged_df.style.applymap(
-                    lambda val: 'background-color: #469798; color: white' if isinstance(val, str) and val.endswith('%') and float(val.strip('%')) >= 98 else
-                                'background-color: #F2A541; color: white' if isinstance(val, str) and val.endswith('%') and 95 <= float(val.strip('%')) < 98 else
-                                'background-color: #BF3100; color: white',
-                    subset=['Abs RN Accuracy', 'Abs Rev Accuracy']
-                )
-                st.dataframe(styled_df)  # Full-width DataFrame
-
+                with st.container():  # Ensures full-width layout
+                    styled_df = merged_df.style.applymap(
+                        lambda val: 'background-color: #469798; color: white' if isinstance(val, str) and val.endswith('%') and float(val.strip('%')) >= 98 else
+                                    'background-color: #F2A541; color: white' if isinstance(val, str) and val.endswith('%') and 95 <= float(val.strip('%')) < 98 else
+                                    'background-color: #BF3100; color: white',
+                        subset=['Abs RN Accuracy', 'Abs Rev Accuracy']
+                    )
+                    st.dataframe(styled_df)  # Expands to screen width
 
                 # Visualization
                 st.markdown("### Visualizations")
