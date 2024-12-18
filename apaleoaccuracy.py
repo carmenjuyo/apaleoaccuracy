@@ -193,7 +193,7 @@ def main():
                 future_rooms_accuracy = (1 - abs(merged_df.loc[future_mask, 'RN Diff']).sum() / merged_df.loc[future_mask, 'AF RNs'].sum()) * 100
                 future_revenue_accuracy = (1 - abs(merged_df.loc[future_mask, 'Rev Diff']).sum() / merged_df.loc[future_mask, 'AF Rev'].sum()) * 100
 
-                # Accuracy Matrix Table
+                # Accuracy Matrix Table with Colour Scaling
                 st.markdown("### Accuracy Matrix")
                 accuracy_data = {
                     "Metric": ["RNs", "Revenue"],
@@ -201,35 +201,28 @@ def main():
                     "Future": [f"{future_rooms_accuracy:.2f}%", f"{future_revenue_accuracy:.2f}%"]
                 }
                 accuracy_df = pd.DataFrame(accuracy_data)
-                st.table(accuracy_df)
 
-                # Day-by-Day Comparison - Full Width
+                def accuracy_color(val):
+                    val = float(val.strip('%'))
+                    if val >= 98:
+                        return 'background-color: #469798; color: white;'
+                    elif 95 <= val < 98:
+                        return 'background-color: #F2A541; color: white;'
+                    else:
+                        return 'background-color: #BF3100; color: white;'
+
+                styled_accuracy_df = accuracy_df.style.applymap(accuracy_color, subset=['Past', 'Future'])
+                st.table(styled_accuracy_df)
+
+                # Day-by-Day Comparison
                 st.markdown("### Day-by-Day Comparison")
-                
-                # Custom CSS for full-width table
-                st.markdown("""
-                    <style>
-                        .dataframe-container {
-                            width: 100%;
-                            overflow-x: auto;
-                        }
-                        table {
-                            width: 100% !important;
-                        }
-                    </style>
-                """, unsafe_allow_html=True)
-                
-                # Styled DataFrame with conditional formatting
                 styled_df = merged_df.style.applymap(
                     lambda val: 'background-color: #469798; color: white' if isinstance(val, str) and val.endswith('%') and float(val.strip('%')) >= 98 else
                                 'background-color: #F2A541; color: white' if isinstance(val, str) and val.endswith('%') and 95 <= float(val.strip('%')) < 98 else
                                 'background-color: #BF3100; color: white',
                     subset=['Abs RN Accuracy', 'Abs Rev Accuracy']
                 )
-                
-                # Render table inside a full-width container
-                st.markdown(f"<div class='dataframe-container'>{styled_df.to_html(escape=False)}</div>", unsafe_allow_html=True)
-
+                st.dataframe(styled_df)
 
                 # Visualization
                 st.markdown("### Visualizations")
