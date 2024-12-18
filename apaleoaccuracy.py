@@ -85,30 +85,31 @@ def create_excel_download(merged_df, accuracy_data):
         worksheet_accuracy.conditional_format('B3:C4', {'type': 'cell', 'criteria': '<', 'value': 0.95, 'format': format_red})
 
         # --- Write the Variance Details ---
-        merged_df['Abs RN Accuracy'] = merged_df['Abs RN Accuracy'].str.rstrip('%').astype(float) / 100
-        merged_df['Abs Rev Accuracy'] = merged_df['Abs Rev Accuracy'].str.rstrip('%').astype(float) / 100
-        merged_df.to_excel(writer, sheet_name='Variance Detail', index=False)
+        # Convert accuracy percentages back to decimals for proper formatting
+        temp_df = merged_df.copy()
+        temp_df['Abs RN Accuracy'] = temp_df['Abs RN Accuracy'].str.rstrip('%').astype(float) / 100
+        temp_df['Abs Rev Accuracy'] = temp_df['Abs Rev Accuracy'].str.rstrip('%').astype(float) / 100
+
+        temp_df.to_excel(writer, sheet_name='Variance Detail', index=False)
         worksheet_variance = writer.sheets['Variance Detail']
 
         # Apply formats to Variance Detail
         worksheet_variance.set_column('H:I', None, format_percent)  # Accuracy columns
-        worksheet_variance.conditional_format('H2:H{}'.format(len(merged_df) + 1),
+        worksheet_variance.conditional_format('H2:H{}'.format(len(temp_df) + 1),
                                               {'type': 'cell', 'criteria': '>=', 'value': 0.98, 'format': format_green})
-        worksheet_variance.conditional_format('H2:H{}'.format(len(merged_df) + 1),
+        worksheet_variance.conditional_format('H2:H{}'.format(len(temp_df) + 1),
                                               {'type': 'cell', 'criteria': 'between', 'minimum': 0.95, 'maximum': 0.98, 'format': format_yellow})
-        worksheet_variance.conditional_format('H2:H{}'.format(len(merged_df) + 1),
+        worksheet_variance.conditional_format('H2:H{}'.format(len(temp_df) + 1),
                                               {'type': 'cell', 'criteria': '<', 'value': 0.95, 'format': format_red})
-        worksheet_variance.conditional_format('I2:I{}'.format(len(merged_df) + 1),
+        worksheet_variance.conditional_format('I2:I{}'.format(len(temp_df) + 1),
                                               {'type': 'cell', 'criteria': '>=', 'value': 0.98, 'format': format_green})
-        worksheet_variance.conditional_format('I2:I{}'.format(len(merged_df) + 1),
+        worksheet_variance.conditional_format('I2:I{}'.format(len(temp_df) + 1),
                                               {'type': 'cell', 'criteria': 'between', 'minimum': 0.95, 'maximum': 0.98, 'format': format_yellow})
-        worksheet_variance.conditional_format('I2:I{}'.format(len(merged_df) + 1),
+        worksheet_variance.conditional_format('I2:I{}'.format(len(temp_df) + 1),
                                               {'type': 'cell', 'criteria': '<', 'value': 0.95, 'format': format_red})
 
     output.seek(0)
     return output
-
-
 
 
 # Streamlit application
