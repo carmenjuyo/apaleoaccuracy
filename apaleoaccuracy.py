@@ -136,7 +136,7 @@ def create_excel_download(combined_df, base_filename, past_accuracy_rn, past_acc
 # Streamlit application
 def main():
     # Center the title
-    st.markdown("<h1 style='text-align: center;'> Guestline Daily Variance and Accuracy Calculator</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'> Apaleo Daily Variance and Accuracy Calculator</h1>", unsafe_allow_html=True)
 
     # File uploaders
     col1, col2 = st.columns(2)
