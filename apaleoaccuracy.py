@@ -203,16 +203,33 @@ def main():
                 accuracy_df = pd.DataFrame(accuracy_data)
                 st.table(accuracy_df)
 
-                # Day-by-Day Comparison
+                # Day-by-Day Comparison - Full Width
                 st.markdown("### Day-by-Day Comparison")
-                with st.container():  # Ensures full-width layout
-                    styled_df = merged_df.style.applymap(
-                        lambda val: 'background-color: #469798; color: white' if isinstance(val, str) and val.endswith('%') and float(val.strip('%')) >= 98 else
-                                    'background-color: #F2A541; color: white' if isinstance(val, str) and val.endswith('%') and 95 <= float(val.strip('%')) < 98 else
-                                    'background-color: #BF3100; color: white',
-                        subset=['Abs RN Accuracy', 'Abs Rev Accuracy']
-                    )
-                    st.dataframe(styled_df)  # Expands to screen width
+                
+                # Custom CSS for full-width table
+                st.markdown("""
+                    <style>
+                        .dataframe-container {
+                            width: 100%;
+                            overflow-x: auto;
+                        }
+                        table {
+                            width: 100% !important;
+                        }
+                    </style>
+                """, unsafe_allow_html=True)
+                
+                # Styled DataFrame with conditional formatting
+                styled_df = merged_df.style.applymap(
+                    lambda val: 'background-color: #469798; color: white' if isinstance(val, str) and val.endswith('%') and float(val.strip('%')) >= 98 else
+                                'background-color: #F2A541; color: white' if isinstance(val, str) and val.endswith('%') and 95 <= float(val.strip('%')) < 98 else
+                                'background-color: #BF3100; color: white',
+                    subset=['Abs RN Accuracy', 'Abs Rev Accuracy']
+                )
+                
+                # Render table inside a full-width container
+                st.markdown(f"<div class='dataframe-container'>{styled_df.to_html(escape=False)}</div>", unsafe_allow_html=True)
+
 
                 # Visualization
                 st.markdown("### Visualizations")
