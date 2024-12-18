@@ -10,7 +10,7 @@ from io import BytesIO
 st.set_page_config(layout="wide", page_title="Apaleo Daily Variance and Accuracy Calculator")
 
 # Define the function to read the two CSV files
-def read_data(file, is_history_and_forecast_file, revenue_column=None):
+def read_data(file, is_history_and_forecast_file, revenue_type=None):
     if not file.name.endswith('.csv'):
         raise ValueError("Unsupported file format. Please upload a .csv file.")
 
@@ -22,11 +22,11 @@ def read_data(file, is_history_and_forecast_file, revenue_column=None):
             if col not in df.columns:
                 raise ValueError(f"Expected column '{col}' not found in the uploaded file.")
         
-        # Use the chosen revenue column dynamically
-        revenue_column = revenue_column if revenue_column in ['netAccommodationRevenue', 'grossRevenue'] else 'netAccommodationRevenue'
-        
+        # Choose the revenue column dynamically
+        revenue_column = revenue_type if revenue_type in df.columns else 'netAccommodationRevenue'
         df = df[['businessDay', 'soldCount', revenue_column]]
         df.columns = ['date', 'AF RNs', 'AF Rev']  # Rename columns for consistency
+
         try:
             df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce').dt.date
         except Exception as e:
@@ -40,6 +40,7 @@ def read_data(file, is_history_and_forecast_file, revenue_column=None):
                 raise ValueError(f"Expected column '{col}' not found in the uploaded file.")
         df = df[['arrivalDate', 'rn', 'revNet']]
         df.columns = ['date', 'Juyo RN', 'Juyo Rev']  # Rename columns for consistency
+
         try:
             df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce').dt.date
         except Exception as e:
@@ -134,7 +135,9 @@ def main():
         daily_totals_file = st.file_uploader("Upload Daily Totals (.csv)", type=['csv'])
 
     # Revenue Type Selection
-    revenue_type = st.radio("Select Revenue Type for History and Forecast", ["netAccommodationRevenue", "grossRevenue"], index=0)
+    revenue_type = None
+    if history_forecast_file:
+        revenue_type = st.radio("Select Revenue Type for History and Forecast", ["netAccommodationRevenue", "grossRevenue"], index=0)
 
     if history_forecast_file and daily_totals_file:
         if st.button("Process Data"):
@@ -200,27 +203,11 @@ def main():
                 )
                 st.table(styled_accuracy_df)
 
-                # Visualization
-                fig = make_subplots(specs=[[{"secondary_y": True}]])
-                fig.add_trace(go.Bar(x=merged_df['date'], y=merged_df['RN Diff'], name='RNs Discrepancy', marker_color='#469798'), secondary_y=False)
-                fig.add_trace(go.Scatter(x=merged_df['date'], y=merged_df['Rev Diff'], name='Revenue Discrepancy', mode='lines+markers', line=dict(color='#BF3100', width=2)), secondary_y=True)
-
-                fig.update_layout(height=600, xaxis_title='Date', yaxis_title='RN Discrepancy', yaxis2_title='Revenue Discrepancy')
-                st.plotly_chart(fig, use_container_width=True)
-
-                # Day-by-Day Comparison
+                # Visualization and Day-by-Day Comparison
                 st.markdown("### Day-by-Day Comparison")
-                styled_df = merged_df.style.applymap(
-                    lambda val: 'background-color: #469798; color: white' if isinstance(val, str) and val.endswith('%') and float(val.strip('%')) >= 98 else
-                                'background-color: #F2A541; color: white' if isinstance(val, str) and val.endswith('%') and 95 <= float(val.strip('%')) < 98 else
-                                'background-color: #BF3100; color: white',
-                    subset=['Abs RN Accuracy', 'Abs Rev Accuracy']
-                )
-                st.markdown(f"<div style='width: 100%; overflow-x: auto;'>{styled_df.to_html(escape=False)}</div>", unsafe_allow_html=True)
+                st.dataframe(merged_df)
 
-                progress_bar.progress(90)
-
-                # Generate dynamic Excel filename
+                # Excel download
                 excel_filename = f"{daily_totals_file.name.split('_')[0]}_ACCURACY_REPORT_{datetime.now().strftime('%Y%m%d_%H%M%S')}_CET.xlsx"
                 excel_data = create_excel_download(merged_df, accuracy_data)
                 st.download_button(label="Download Excel Report", data=excel_data, file_name=excel_filename, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -229,3 +216,4 @@ def main():
 
             except Exception as e:
                 st.error(f"Error processing files: {e}")
+
