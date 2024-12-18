@@ -66,7 +66,13 @@ def create_excel_download(merged_df, accuracy_data):
         workbook = writer.book
 
         # --- Write the Accuracy Matrix ---
-        accuracy_df = pd.DataFrame(accuracy_data)
+        # Ensure accuracy_data values are in decimals, not strings
+        accuracy_df = pd.DataFrame({
+            "Metric": accuracy_data["Metric"],
+            "Past": [float(val.strip('%')) / 100 for val in accuracy_data["Past"]],
+            "Future": [float(val.strip('%')) / 100 for val in accuracy_data["Future"]]
+        })
+
         accuracy_df.to_excel(writer, sheet_name='Accuracy Matrix', index=False, startrow=1)
         worksheet_accuracy = writer.sheets['Accuracy Matrix']
 
@@ -110,6 +116,7 @@ def create_excel_download(merged_df, accuracy_data):
 
     output.seek(0)
     return output
+
 
 
 # Streamlit application
