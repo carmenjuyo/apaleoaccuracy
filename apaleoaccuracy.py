@@ -28,7 +28,7 @@ def read_data(file, is_history_and_forecast_file):
             raise ValueError(f"Error converting 'businessDay' column to datetime: {e}")
     else:
         # Daily totals file
-        expected_columns = ['arrivalDate', '"rn"', '"revNet"', '"revTotal"', '"revFb"', '"revResTotal"']
+        expected_columns = ['arrivalDate', 'rn', 'revNet', 'revTotal', 'revFb', 'revResTotal']
         df = pd.read_csv(file, delimiter=';', quotechar='"')
         for col in expected_columns:
             if col not in df.columns:
