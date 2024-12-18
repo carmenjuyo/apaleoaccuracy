@@ -124,7 +124,7 @@ def create_excel_download(merged_df, accuracy_data):
 
     output.seek(0)
     return output
-
+    
 def main():
     # Center the title
     st.markdown("<h1 style='text-align: center;'> Guestline Daily Variance and Accuracy Calculator</h1>", unsafe_allow_html=True)
