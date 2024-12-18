@@ -136,7 +136,7 @@ def create_excel_download(combined_df, base_filename, past_accuracy_rn, past_acc
 # Streamlit application
 def main():
     # Center the title
-    st.markdown("<h1 style='text-align: center;'> Apaleo Daily Variance and Accuracy Calculator</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'> Guestline Daily Variance and Accuracy Calculator</h1>", unsafe_allow_html=True)
 
     # File uploaders
     col1, col2 = st.columns(2)
@@ -148,12 +148,18 @@ def main():
     if history_forecast_file and daily_totals_file:
         if st.button("Process Data"):
             try:
+                progress_bar = st.progress(0)
+
                 # Read the files
                 hf_df = read_data(history_forecast_file, is_history_and_forecast_file=True)
+                progress_bar.progress(25)
+
                 dt_df = read_data(daily_totals_file, is_history_and_forecast_file=False)
+                progress_bar.progress(50)
 
                 # Merge data
                 merged_df = pd.merge(hf_df, dt_df, on='date', how='inner')
+                progress_bar.progress(60)
 
                 # Calculate discrepancies
                 merged_df['RN Diff'] = merged_df['Juyo RN'] - merged_df['AF RNs']
@@ -176,9 +182,36 @@ def main():
                 merged_df['Abs RN Accuracy'] = merged_df['Abs RN Accuracy'].map(lambda x: f"{x:.2f}%")
                 merged_df['Abs Rev Accuracy'] = merged_df['Abs Rev Accuracy'].map(lambda x: f"{x:.2f}%")
 
-                # Display merged data
-                st.markdown("### Merged Data")
-                st.dataframe(merged_df)
+                progress_bar.progress(75)
+
+                # Calculate overall accuracies
+                current_date = pd.to_datetime('today').date()
+                past_mask = merged_df['date'] < current_date
+                future_mask = merged_df['date'] >= current_date
+                past_rooms_accuracy = (1 - abs(merged_df.loc[past_mask, 'RN Diff']).sum() / merged_df.loc[past_mask, 'AF RNs'].sum()) * 100
+                past_revenue_accuracy = (1 - abs(merged_df.loc[past_mask, 'Rev Diff']).sum() / merged_df.loc[past_mask, 'AF Rev'].sum()) * 100
+                future_rooms_accuracy = (1 - abs(merged_df.loc[future_mask, 'RN Diff']).sum() / merged_df.loc[future_mask, 'AF RNs'].sum()) * 100
+                future_revenue_accuracy = (1 - abs(merged_df.loc[future_mask, 'Rev Diff']).sum() / merged_df.loc[future_mask, 'AF Rev'].sum()) * 100
+
+                # Accuracy Matrix Table
+                st.markdown("### Accuracy Matrix")
+                accuracy_data = {
+                    "Metric": ["RNs", "Revenue"],
+                    "Past": [f"{past_rooms_accuracy:.2f}%", f"{past_revenue_accuracy:.2f}%"],
+                    "Future": [f"{future_rooms_accuracy:.2f}%", f"{future_revenue_accuracy:.2f}%"]
+                }
+                accuracy_df = pd.DataFrame(accuracy_data)
+                st.table(accuracy_df)
+
+                # Day-by-Day Comparison
+                st.markdown("### Day-by-Day Comparison")
+                styled_df = merged_df.style.applymap(
+                    lambda val: 'background-color: #469798; color: white' if isinstance(val, str) and val.endswith('%') and float(val.strip('%')) >= 98 else
+                                'background-color: #F2A541; color: white' if isinstance(val, str) and val.endswith('%') and 95 <= float(val.strip('%')) < 98 else
+                                'background-color: #BF3100; color: white',
+                    subset=['Abs RN Accuracy', 'Abs Rev Accuracy']
+                )
+                st.dataframe(styled_df)
 
                 # Visualization
                 st.markdown("### Visualizations")
@@ -213,6 +246,8 @@ def main():
 
                 st.plotly_chart(fig, use_container_width=True)
 
+                progress_bar.progress(90)
+
                 # Define Excel export function
                 def create_excel_download():
                     output = BytesIO()
@@ -225,8 +260,11 @@ def main():
                 excel_data = create_excel_download()
                 st.download_button(label="Download Excel Report", data=excel_data, file_name="Variance_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
+                progress_bar.progress(100)
+
             except Exception as e:
                 st.error(f"Error processing files: {e}")
 
 if __name__ == "__main__":
     main()
+
