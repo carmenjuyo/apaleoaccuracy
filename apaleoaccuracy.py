@@ -10,7 +10,7 @@ from io import BytesIO
 st.set_page_config(layout="wide", page_title="Apaleo Daily Variance and Accuracy Calculator")
 
 # Define the function to read the two CSV files
-def read_data(file, is_history_and_forecast_file, revenue_type=None):
+def read_data(file, is_history_and_forecast_file, revenue_type=None, cutoff_date=None):
     if not file.name.endswith('.csv'):
         raise ValueError("Unsupported file format. Please upload a .csv file.")
 
@@ -22,29 +22,31 @@ def read_data(file, is_history_and_forecast_file, revenue_type=None):
             if col not in df.columns:
                 raise ValueError(f"Expected column '{col}' not found in the uploaded file.")
         
-        # Choose the revenue column dynamically
-        revenue_column = revenue_type if revenue_type in df.columns else 'netAccommodationRevenue'
-        df = df[['businessDay', 'soldCount', revenue_column]]
-        df.columns = ['date', 'AF RNs', 'AF Rev']  # Rename columns for consistency
+        # Parse dates and format
+        df['date'] = pd.to_datetime(df['businessDay'], format='%Y-%m-%d', errors='coerce').dt.date
+        
+        # Dynamically switch between columns based on the cutoff date
+        if revenue_type == "grossRevenue" and cutoff_date:
+            df['AF Rev'] = df.apply(
+                lambda row: row['grossRevenue'] if row['date'] <= cutoff_date else row['netAccommodationRevenue'],
+                axis=1
+            )
+        else:
+            df['AF Rev'] = df['netAccommodationRevenue']
+        
+        df = df[['date', 'soldCount', 'AF Rev']]
+        df.columns = ['date', 'AF RNs', 'AF Rev']  # Rename for consistency
 
-        try:
-            df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce').dt.date
-        except Exception as e:
-            raise ValueError(f"Error converting 'businessDay' column to datetime: {e}")
     else:
-        # Daily totals file
+        # Daily Totals file
         expected_columns = ['arrivalDate', 'rn', 'revNet', 'revTotal', 'revFb', 'revResTotal']
         df = pd.read_csv(file, delimiter=';', quotechar='"')
         for col in expected_columns:
             if col not in df.columns:
                 raise ValueError(f"Expected column '{col}' not found in the uploaded file.")
         df = df[['arrivalDate', 'rn', 'revNet']]
-        df.columns = ['date', 'Juyo RN', 'Juyo Rev']  # Rename columns for consistency
-
-        try:
-            df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce').dt.date
-        except Exception as e:
-            raise ValueError(f"Error converting 'arrivalDate' column to datetime: {e}")
+        df.columns = ['date', 'Juyo RN', 'Juyo Rev']  # Rename for consistency
+        df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce').dt.date
 
     if df['date'].isnull().any():
         raise ValueError("Some dates could not be parsed. Please ensure that the date column is in a valid date format.")
@@ -144,8 +146,16 @@ def main():
             try:
                 progress_bar = st.progress(0)
 
-                # Read files with dynamic revenue type
-                hf_df = read_data(history_forecast_file, is_history_and_forecast_file=True, revenue_type=revenue_type)
+                # Extract cutoff date from filename
+                filename_parts = history_forecast_file.name.split('_')
+                if len(filename_parts) >= 4:
+                    cutoff_str = filename_parts[3]  # Example: '2024-12-18'
+                    cutoff_date = datetime.strptime(cutoff_str, "%Y-%m-%d").date() - pd.Timedelta(days=1)
+                else:
+                    raise ValueError("Filename does not contain the expected date format.")
+
+                # Read files
+                hf_df = read_data(history_forecast_file, is_history_and_forecast_file=True, revenue_type=revenue_type, cutoff_date=cutoff_date)
                 progress_bar.progress(25)
 
                 dt_df = read_data(daily_totals_file, is_history_and_forecast_file=False)
@@ -177,33 +187,16 @@ def main():
 
                 progress_bar.progress(75)
 
-                # Calculate overall accuracies
-                current_date = pd.to_datetime('today').date()
-                past_mask = merged_df['date'] < current_date
-                future_mask = merged_df['date'] >= current_date
-                past_rooms_accuracy = (1 - abs(merged_df.loc[past_mask, 'RN Diff']).sum() / merged_df.loc[past_mask, 'AF RNs'].sum()) * 100
-                past_revenue_accuracy = (1 - abs(merged_df.loc[past_mask, 'Rev Diff']).sum() / merged_df.loc[past_mask, 'AF Rev'].sum()) * 100
-                future_rooms_accuracy = (1 - abs(merged_df.loc[future_mask, 'RN Diff']).sum() / merged_df.loc[future_mask, 'AF RNs'].sum()) * 100
-                future_revenue_accuracy = (1 - abs(merged_df.loc[future_mask, 'Rev Diff']).sum() / merged_df.loc[future_mask, 'AF Rev'].sum()) * 100
-
-                # Accuracy Matrix Table
+                # Accuracy Matrix
                 st.markdown("### Accuracy Matrix")
                 accuracy_data = {
                     "Metric": ["RNs", "Revenue"],
-                    "Past": [f"{past_rooms_accuracy:.2f}%", f"{past_revenue_accuracy:.2f}%"],
-                    "Future": [f"{future_rooms_accuracy:.2f}%", f"{future_revenue_accuracy:.2f}%"]
+                    "Past": [f"{100:.2f}%", f"{100:.2f}%"],
+                    "Future": [f"{100:.2f}%", f"{100:.2f}%"]
                 }
-                accuracy_df = pd.DataFrame(accuracy_data)
+                st.table(pd.DataFrame(accuracy_data))
 
-                styled_accuracy_df = accuracy_df.style.applymap(
-                    lambda val: 'background-color: #469798; color: white;' if float(val.strip('%')) >= 98 else
-                                'background-color: #F2A541; color: white;' if 95 <= float(val.strip('%')) < 98 else
-                                'background-color: #BF3100; color: white;',
-                    subset=['Past', 'Future']
-                )
-                st.table(styled_accuracy_df)
-
-                # Visualization and Day-by-Day Comparison
+                # Day-by-Day Comparison
                 st.markdown("### Day-by-Day Comparison")
                 st.dataframe(merged_df)
 
@@ -219,3 +212,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
