@@ -254,14 +254,6 @@ def main():
 
                 progress_bar.progress(90)
 
-                # Define Excel export function
-                def create_excel_download():
-                    output = BytesIO()
-                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                        merged_df.to_excel(writer, index=False, sheet_name='Variance')
-                    output.seek(0)
-                    return output
-
                 # Add download button
                 excel_data = create_excel_download(merged_df, accuracy_data)
                 st.download_button(label="Download Excel Report", data=excel_data, file_name="Variance_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
