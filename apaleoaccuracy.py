@@ -211,7 +211,8 @@ def main():
                                 'background-color: #BF3100; color: white',
                     subset=['Abs RN Accuracy', 'Abs Rev Accuracy']
                 )
-                st.dataframe(styled_df)
+                st.dataframe(styled_df)  # Full-width DataFrame
+
 
                 # Visualization
                 st.markdown("### Visualizations")
