@@ -76,7 +76,7 @@ def create_excel_download(merged_df, accuracy_data):
         format_red = workbook.add_format({'bg_color': '#BF3100', 'font_color': 'white'})
         format_percent = workbook.add_format({'num_format': '0.00%'})
 
-        # Apply formatting to columns
+        # Apply formatting to Accuracy Matrix columns
         worksheet_accuracy.set_column('B:C', None, format_percent)
 
         # Apply conditional formatting to the Accuracy Matrix
@@ -85,27 +85,29 @@ def create_excel_download(merged_df, accuracy_data):
         worksheet_accuracy.conditional_format('B3:C4', {'type': 'cell', 'criteria': '<', 'value': 0.95, 'format': format_red})
 
         # --- Write the Variance Details ---
+        merged_df['Abs RN Accuracy'] = merged_df['Abs RN Accuracy'].str.rstrip('%').astype(float) / 100
+        merged_df['Abs Rev Accuracy'] = merged_df['Abs Rev Accuracy'].str.rstrip('%').astype(float) / 100
         merged_df.to_excel(writer, sheet_name='Variance Detail', index=False)
         worksheet_variance = writer.sheets['Variance Detail']
 
         # Apply formats to Variance Detail
         worksheet_variance.set_column('H:I', None, format_percent)  # Accuracy columns
-        worksheet_variance.conditional_format('H2:H{}'.format(len(merged_df) + 1), 
-                                              {'type': 'cell', 'criteria': '>=', 'value': 98, 'format': format_green})
-        worksheet_variance.conditional_format('H2:H{}'.format(len(merged_df) + 1), 
-                                              {'type': 'cell', 'criteria': 'between', 'minimum': 95, 'maximum': 98, 'format': format_yellow})
-        worksheet_variance.conditional_format('H2:H{}'.format(len(merged_df) + 1), 
-                                              {'type': 'cell', 'criteria': '<', 'value': 95, 'format': format_red})
-
-        worksheet_variance.conditional_format('I2:I{}'.format(len(merged_df) + 1), 
-                                              {'type': 'cell', 'criteria': '>=', 'value': 98, 'format': format_green})
-        worksheet_variance.conditional_format('I2:I{}'.format(len(merged_df) + 1), 
-                                              {'type': 'cell', 'criteria': 'between', 'minimum': 95, 'maximum': 98, 'format': format_yellow})
-        worksheet_variance.conditional_format('I2:I{}'.format(len(merged_df) + 1), 
-                                              {'type': 'cell', 'criteria': '<', 'value': 95, 'format': format_red})
+        worksheet_variance.conditional_format('H2:H{}'.format(len(merged_df) + 1),
+                                              {'type': 'cell', 'criteria': '>=', 'value': 0.98, 'format': format_green})
+        worksheet_variance.conditional_format('H2:H{}'.format(len(merged_df) + 1),
+                                              {'type': 'cell', 'criteria': 'between', 'minimum': 0.95, 'maximum': 0.98, 'format': format_yellow})
+        worksheet_variance.conditional_format('H2:H{}'.format(len(merged_df) + 1),
+                                              {'type': 'cell', 'criteria': '<', 'value': 0.95, 'format': format_red})
+        worksheet_variance.conditional_format('I2:I{}'.format(len(merged_df) + 1),
+                                              {'type': 'cell', 'criteria': '>=', 'value': 0.98, 'format': format_green})
+        worksheet_variance.conditional_format('I2:I{}'.format(len(merged_df) + 1),
+                                              {'type': 'cell', 'criteria': 'between', 'minimum': 0.95, 'maximum': 0.98, 'format': format_yellow})
+        worksheet_variance.conditional_format('I2:I{}'.format(len(merged_df) + 1),
+                                              {'type': 'cell', 'criteria': '<', 'value': 0.95, 'format': format_red})
 
     output.seek(0)
     return output
+
 
 
 
@@ -260,8 +262,9 @@ def main():
                     return output
 
                 # Add download button
-                excel_data = create_excel_download()
+                excel_data = create_excel_download(merged_df, accuracy_data)
                 st.download_button(label="Download Excel Report", data=excel_data, file_name="Variance_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                
 
                 progress_bar.progress(100)
 
