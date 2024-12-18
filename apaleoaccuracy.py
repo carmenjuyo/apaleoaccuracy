@@ -217,3 +217,5 @@ def main():
             except Exception as e:
                 st.error(f"Error processing files: {e}")
 
+if __name__ == "__main__":
+    main()
