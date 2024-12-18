@@ -60,49 +60,53 @@ def color_scale(val):
     return ''
     
 # Function to create Excel file for download with color formatting and accuracy matrix
-def create_excel_download():
+def create_excel_download(merged_df, accuracy_data):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         workbook = writer.book
 
-        # Write the data to the 'Variance' sheet
-        merged_df.to_excel(writer, index=False, sheet_name='Variance')
-        worksheet = writer.sheets['Variance']
+        # --- Write the Accuracy Matrix ---
+        accuracy_df = pd.DataFrame(accuracy_data)
+        accuracy_df.to_excel(writer, sheet_name='Accuracy Matrix', index=False, startrow=1)
+        worksheet_accuracy = writer.sheets['Accuracy Matrix']
 
-        # Define formats
-        format_green = workbook.add_format({'bg_color': '#469798', 'font_color': '#FFFFFF'})
-        format_yellow = workbook.add_format({'bg_color': '#F2A541', 'font_color': '#FFFFFF'})
-        format_red = workbook.add_format({'bg_color': '#BF3100', 'font_color': '#FFFFFF'})
+        # Define formats for Accuracy Matrix
+        format_green = workbook.add_format({'bg_color': '#469798', 'font_color': 'white'})
+        format_yellow = workbook.add_format({'bg_color': '#F2A541', 'font_color': 'white'})
+        format_red = workbook.add_format({'bg_color': '#BF3100', 'font_color': 'white'})
         format_percent = workbook.add_format({'num_format': '0.00%'})
 
-        # Apply percentage format to accuracy columns
-        worksheet.set_column('H:I', None, format_percent)  # Columns H and I for Abs RN Accuracy and Abs Rev Accuracy
+        # Apply formatting to columns
+        worksheet_accuracy.set_column('B:C', None, format_percent)
 
-        # Apply conditional formatting for Abs RN Accuracy
-        worksheet.conditional_format('H2:H{}'.format(len(merged_df) + 1), 
-                                     {'type': 'cell', 'criteria': '>=', 'value': 98, 'format': format_green})
-        worksheet.conditional_format('H2:H{}'.format(len(merged_df) + 1), 
-                                     {'type': 'cell', 'criteria': 'between', 'minimum': 95, 'maximum': 98, 'format': format_yellow})
-        worksheet.conditional_format('H2:H{}'.format(len(merged_df) + 1), 
-                                     {'type': 'cell', 'criteria': '<', 'value': 95, 'format': format_red})
+        # Apply conditional formatting to the Accuracy Matrix
+        worksheet_accuracy.conditional_format('B3:C4', {'type': 'cell', 'criteria': '>=', 'value': 0.98, 'format': format_green})
+        worksheet_accuracy.conditional_format('B3:C4', {'type': 'cell', 'criteria': 'between', 'minimum': 0.95, 'maximum': 0.98, 'format': format_yellow})
+        worksheet_accuracy.conditional_format('B3:C4', {'type': 'cell', 'criteria': '<', 'value': 0.95, 'format': format_red})
 
-        # Apply conditional formatting for Abs Rev Accuracy
-        worksheet.conditional_format('I2:I{}'.format(len(merged_df) + 1), 
-                                     {'type': 'cell', 'criteria': '>=', 'value': 98, 'format': format_green})
-        worksheet.conditional_format('I2:I{}'.format(len(merged_df) + 1), 
-                                     {'type': 'cell', 'criteria': 'between', 'minimum': 95, 'maximum': 98, 'format': format_yellow})
-        worksheet.conditional_format('I2:I{}'.format(len(merged_df) + 1), 
-                                     {'type': 'cell', 'criteria': '<', 'value': 95, 'format': format_red})
+        # --- Write the Variance Details ---
+        merged_df.to_excel(writer, sheet_name='Variance Detail', index=False)
+        worksheet_variance = writer.sheets['Variance Detail']
 
-        # Ensure numeric columns are formatted appropriately
-        worksheet.set_column('B:B', None, workbook.add_format({'num_format': '0'}))  # AF RNs
-        worksheet.set_column('C:C', None, workbook.add_format({'num_format': '#,##0.00'}))  # AF Rev
-        worksheet.set_column('D:D', None, workbook.add_format({'num_format': '0'}))  # Juyo RN
-        worksheet.set_column('E:E', None, workbook.add_format({'num_format': '#,##0.00'}))  # Juyo Rev
-        worksheet.set_column('F:G', None, workbook.add_format({'num_format': '#,##0'}))  # RN Diff and Rev Diff
+        # Apply formats to Variance Detail
+        worksheet_variance.set_column('H:I', None, format_percent)  # Accuracy columns
+        worksheet_variance.conditional_format('H2:H{}'.format(len(merged_df) + 1), 
+                                              {'type': 'cell', 'criteria': '>=', 'value': 98, 'format': format_green})
+        worksheet_variance.conditional_format('H2:H{}'.format(len(merged_df) + 1), 
+                                              {'type': 'cell', 'criteria': 'between', 'minimum': 95, 'maximum': 98, 'format': format_yellow})
+        worksheet_variance.conditional_format('H2:H{}'.format(len(merged_df) + 1), 
+                                              {'type': 'cell', 'criteria': '<', 'value': 95, 'format': format_red})
+
+        worksheet_variance.conditional_format('I2:I{}'.format(len(merged_df) + 1), 
+                                              {'type': 'cell', 'criteria': '>=', 'value': 98, 'format': format_green})
+        worksheet_variance.conditional_format('I2:I{}'.format(len(merged_df) + 1), 
+                                              {'type': 'cell', 'criteria': 'between', 'minimum': 95, 'maximum': 98, 'format': format_yellow})
+        worksheet_variance.conditional_format('I2:I{}'.format(len(merged_df) + 1), 
+                                              {'type': 'cell', 'criteria': '<', 'value': 95, 'format': format_red})
 
     output.seek(0)
     return output
+
 
 
 # Streamlit application
